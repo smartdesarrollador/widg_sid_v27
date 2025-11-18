@@ -147,6 +147,8 @@ class ProcessFloatingPanel(QWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.content_widget)
         scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll_area.setStyleSheet("""
             QScrollArea {
                 border: none;
@@ -164,6 +166,19 @@ class ProcessFloatingPanel(QWidget):
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0px;
+            }
+            QScrollBar:horizontal {
+                background-color: #2d2d2d;
+                height: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:horizontal {
+                background-color: #00ff88;
+                border-radius: 6px;
+                min-width: 20px;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
             }
         """)
         main_layout.addWidget(scroll_area)
@@ -465,12 +480,92 @@ class ProcessFloatingPanel(QWidget):
                     """)
                     step_layout.addWidget(step_header)
 
+                    # Create horizontal layout for item and action buttons
+                    item_row_widget = QWidget()
+                    item_row_layout = QHBoxLayout(item_row_widget)
+                    item_row_layout.setContentsMargins(0, 0, 0, 0)
+                    item_row_layout.setSpacing(8)
+
                     # Convert dict to Item object and display as regular item
                     item = Item.from_dict(item_dict)
                     self.all_items.append(item)
                     item_widget = ItemButton(item, self)
                     item_widget.item_clicked.connect(lambda i=item: self.on_item_clicked(i))
-                    step_layout.addWidget(item_widget)
+                    item_row_layout.addWidget(item_widget, stretch=1)
+
+                    # Add action buttons based on item type
+                    item_type = step.item_type  # Get item type from ProcessStep
+
+                    if item_type == "URL":
+                        # URL button - open in browser
+                        url_button = QPushButton("🌐")
+                        url_button.setFixedSize(32, 32)
+                        url_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                        url_button.setStyleSheet("""
+                            QPushButton {
+                                background-color: #3d3d3d;
+                                color: #00ccff;
+                                border: 1px solid #555555;
+                                border-radius: 16px;
+                                font-size: 12pt;
+                            }
+                            QPushButton:hover {
+                                background-color: #00ccff;
+                                color: #000000;
+                                border-color: #00ccff;
+                            }
+                        """)
+                        url_button.setToolTip(f"Abrir URL: {step.item_content}")
+                        url_button.clicked.connect(lambda checked, content=step.item_content: self.on_url_button_clicked(content))
+                        item_row_layout.addWidget(url_button)
+
+                    elif item_type == "CODE":
+                        # CODE button - execute command
+                        code_button = QPushButton("▶️")
+                        code_button.setFixedSize(32, 32)
+                        code_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                        code_button.setStyleSheet("""
+                            QPushButton {
+                                background-color: #3d3d3d;
+                                color: #00ff88;
+                                border: 1px solid #555555;
+                                border-radius: 16px;
+                                font-size: 12pt;
+                            }
+                            QPushButton:hover {
+                                background-color: #00ff88;
+                                color: #000000;
+                                border-color: #00ff88;
+                            }
+                        """)
+                        code_button.setToolTip(f"Ejecutar comando: {step.item_content}")
+                        code_button.clicked.connect(lambda checked, content=step.item_content: self.on_code_button_clicked(content))
+                        item_row_layout.addWidget(code_button)
+
+                    elif item_type == "PATH":
+                        # PATH button - open file/folder
+                        path_button = QPushButton("📁")
+                        path_button.setFixedSize(32, 32)
+                        path_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                        path_button.setStyleSheet("""
+                            QPushButton {
+                                background-color: #3d3d3d;
+                                color: #ff6b00;
+                                border: 1px solid #555555;
+                                border-radius: 16px;
+                                font-size: 12pt;
+                            }
+                            QPushButton:hover {
+                                background-color: #ff6b00;
+                                color: #000000;
+                                border-color: #ff6b00;
+                            }
+                        """)
+                        path_button.setToolTip(f"Abrir ruta: {step.item_content}")
+                        path_button.clicked.connect(lambda checked, content=step.item_content: self.on_path_button_clicked(content))
+                        item_row_layout.addWidget(path_button)
+
+                    step_layout.addWidget(item_row_widget)
             else:
                 logger.warning(f"Item {step.item_id} not found for step {step.id}")
 
@@ -793,6 +888,92 @@ class ProcessFloatingPanel(QWidget):
                 self.panel_id = None
             except Exception as e:
                 logger.error(f"Error deleting process panel from database: {e}", exc_info=True)
+
+    # ========== ACTION BUTTON HANDLERS ==========
+
+    def on_url_button_clicked(self, url: str):
+        """Handle URL button click - open in default browser"""
+        try:
+            import webbrowser
+            webbrowser.open(url)
+            logger.info(f"Opening URL: {url}")
+        except Exception as e:
+            logger.error(f"Error opening URL {url}: {e}")
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"No se pudo abrir la URL:\n{url}\n\nError: {str(e)}"
+            )
+
+    def on_code_button_clicked(self, command: str):
+        """Handle CODE button click - execute command"""
+        try:
+            import subprocess
+
+            # Confirmation dialog
+            reply = QMessageBox.question(
+                self,
+                "Ejecutar Comando",
+                f"¿Ejecutar el siguiente comando?\n\n{command}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                # Execute command in shell
+                if command.strip():
+                    # Run command in background without waiting
+                    subprocess.Popen(
+                        command,
+                        shell=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    )
+                    logger.info(f"Executing command: {command}")
+
+                    # Show feedback
+                    QMessageBox.information(
+                        self,
+                        "Comando Ejecutado",
+                        f"Comando ejecutado:\n{command}"
+                    )
+        except Exception as e:
+            logger.error(f"Error executing command {command}: {e}")
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo ejecutar el comando:\n{command}\n\nError: {str(e)}"
+            )
+
+    def on_path_button_clicked(self, path: str):
+        """Handle PATH button click - open file or folder"""
+        try:
+            import os
+            import subprocess
+
+            # Check if path exists
+            if not os.path.exists(path):
+                QMessageBox.warning(
+                    self,
+                    "Ruta No Encontrada",
+                    f"La ruta no existe:\n{path}"
+                )
+                return
+
+            # Open with default application
+            if os.name == 'nt':  # Windows
+                os.startfile(path)
+            elif os.name == 'posix':  # Linux/Mac
+                subprocess.Popen(['xdg-open', path])
+
+            logger.info(f"Opening path: {path}")
+
+        except Exception as e:
+            logger.error(f"Error opening path {path}: {e}")
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo abrir la ruta:\n{path}\n\nError: {str(e)}"
+            )
 
     # Mouse events for resize (right edge) and dragging
     def mousePressEvent(self, event):

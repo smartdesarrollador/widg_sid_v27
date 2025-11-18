@@ -437,7 +437,7 @@ class ProcessesFloatingPanel(QWidget):
         # Scroll area for processes
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setStyleSheet("""
             QScrollArea {
@@ -459,6 +459,22 @@ class ProcessesFloatingPanel(QWidget):
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0px;
+            }
+            QScrollBar:horizontal {
+                background-color: #2d2d2d;
+                height: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:horizontal {
+                background-color: #555555;
+                border-radius: 6px;
+                min-width: 30px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background-color: #ff6b00;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
             }
         """)
 
@@ -880,6 +896,74 @@ class ProcessesFloatingPanel(QWidget):
         self.move(panel_x, panel_y)
 
     # ========== WINDOW EVENTS ==========
+
+    def is_on_left_edge(self, pos):
+        """Check if mouse position is on the left edge for resizing"""
+        return pos.x() <= self.resize_edge_width
+
+    def event(self, event):
+        """Override event to handle hover for cursor changes"""
+        from PyQt6.QtCore import QEvent
+        from PyQt6.QtGui import QCursor
+
+        if event.type() == QEvent.Type.HoverMove:
+            pos = event.position().toPoint()
+            if self.is_on_left_edge(pos):
+                self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+            else:
+                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+        return super().event(event)
+
+    def mousePressEvent(self, event):
+        """Handle mouse press for dragging or resizing"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.is_on_left_edge(event.pos()):
+                # Start resizing
+                self.resizing = True
+                self.resize_start_x = event.globalPosition().toPoint().x()
+                self.resize_start_width = self.width()
+                event.accept()
+            else:
+                # Start dragging
+                self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move for dragging or resizing"""
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            if self.resizing:
+                # Calculate new width
+                current_x = event.globalPosition().toPoint().x()
+                delta_x = current_x - self.resize_start_x
+                new_width = self.resize_start_width - delta_x  # Subtract because we're dragging from left edge
+
+                # Apply constraints
+                new_width = max(self.minimumWidth(), min(new_width, self.maximumWidth()))
+
+                # Resize and reposition
+                old_width = self.width()
+                old_x = self.x()
+                self.resize(new_width, self.height())
+
+                # Adjust position to keep right edge fixed
+                width_diff = self.width() - old_width
+                self.move(old_x - width_diff, self.y())
+
+                event.accept()
+            else:
+                # Dragging
+                self.move(event.globalPosition().toPoint() - self.drag_position)
+                event.accept()
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release to end resizing"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.resizing:
+                self.resizing = False
+                # Save new width to config
+                if self.config_manager:
+                    self.config_manager.set_setting('panel_width', self.width())
+                event.accept()
 
     def closeEvent(self, event):
         """Handle window close"""

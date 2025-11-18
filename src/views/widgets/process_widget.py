@@ -6,6 +6,7 @@ Características:
 - Metadata (steps count, uso, fecha)
 - Lista de steps (expandible/colapsable)
 - Botones de acción (ejecutar, copiar todo, editar, pin, eliminar)
+- Botones según tipo: URL (abrir), CODE (ejecutar), PATH (abrir archivo/carpeta)
 """
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QFrame, QMessageBox)
@@ -13,6 +14,9 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCursor
 import sys
 import logging
+import subprocess
+import webbrowser
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -288,7 +292,19 @@ class ProcessWidget(QWidget):
             for step in self.process.steps:
                 step_label_text = step.custom_label or step.item_label
 
-                # Step item
+                # Create step widget with label and action buttons
+                step_widget = QWidget()
+                step_widget.setStyleSheet("""
+                    QWidget {
+                        background-color: transparent;
+                        border: none;
+                    }
+                """)
+                step_layout = QHBoxLayout(step_widget)
+                step_layout.setContentsMargins(0, 2, 0, 2)
+                step_layout.setSpacing(8)
+
+                # Step label
                 step_item = QLabel(f"{step.step_order}. {step_label_text}")
                 step_item.setStyleSheet("""
                     QLabel {
@@ -299,7 +315,79 @@ class ProcessWidget(QWidget):
                         padding: 2px;
                     }
                 """)
-                steps_layout.addWidget(step_item)
+                step_layout.addWidget(step_item, stretch=1)
+
+                # Add action buttons based on item_type
+                if step.item_type == "URL":
+                    # URL button - open in browser
+                    url_button = QPushButton("🌐")
+                    url_button.setFixedSize(24, 24)
+                    url_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                    url_button.setStyleSheet("""
+                        QPushButton {
+                            background-color: #3d3d3d;
+                            color: #00ccff;
+                            border: 1px solid #555555;
+                            border-radius: 12px;
+                            font-size: 10pt;
+                        }
+                        QPushButton:hover {
+                            background-color: #00ccff;
+                            color: #000000;
+                            border-color: #00ccff;
+                        }
+                    """)
+                    url_button.setToolTip(f"Abrir URL: {step.item_content}")
+                    url_button.clicked.connect(lambda checked, content=step.item_content: self.on_url_button_clicked(content))
+                    step_layout.addWidget(url_button)
+
+                elif step.item_type == "CODE":
+                    # CODE button - execute command
+                    code_button = QPushButton("▶️")
+                    code_button.setFixedSize(24, 24)
+                    code_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                    code_button.setStyleSheet("""
+                        QPushButton {
+                            background-color: #3d3d3d;
+                            color: #00ff88;
+                            border: 1px solid #555555;
+                            border-radius: 12px;
+                            font-size: 10pt;
+                        }
+                        QPushButton:hover {
+                            background-color: #00ff88;
+                            color: #000000;
+                            border-color: #00ff88;
+                        }
+                    """)
+                    code_button.setToolTip(f"Ejecutar comando: {step.item_content}")
+                    code_button.clicked.connect(lambda checked, content=step.item_content: self.on_code_button_clicked(content))
+                    step_layout.addWidget(code_button)
+
+                elif step.item_type == "PATH":
+                    # PATH button - open file/folder
+                    path_button = QPushButton("📁")
+                    path_button.setFixedSize(24, 24)
+                    path_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                    path_button.setStyleSheet("""
+                        QPushButton {
+                            background-color: #3d3d3d;
+                            color: #ff6b00;
+                            border: 1px solid #555555;
+                            border-radius: 12px;
+                            font-size: 10pt;
+                        }
+                        QPushButton:hover {
+                            background-color: #ff6b00;
+                            color: #000000;
+                            border-color: #ff6b00;
+                        }
+                    """)
+                    path_button.setToolTip(f"Abrir ruta: {step.item_content}")
+                    path_button.clicked.connect(lambda checked, content=step.item_content: self.on_path_button_clicked(content))
+                    step_layout.addWidget(path_button)
+
+                steps_layout.addWidget(step_widget)
         else:
             no_steps_label = QLabel("Sin steps")
             no_steps_label.setStyleSheet("""
@@ -475,6 +563,86 @@ class ProcessWidget(QWidget):
     def on_delete_clicked(self):
         """Handle delete button click"""
         self.process_deleted.emit(self.process.id)
+
+    # ========== ACTION BUTTON HANDLERS ==========
+
+    def on_url_button_clicked(self, url: str):
+        """Handle URL button click - open in default browser"""
+        try:
+            webbrowser.open(url)
+            logger.info(f"Opening URL: {url}")
+        except Exception as e:
+            logger.error(f"Error opening URL {url}: {e}")
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"No se pudo abrir la URL:\n{url}\n\nError: {str(e)}"
+            )
+
+    def on_code_button_clicked(self, command: str):
+        """Handle CODE button click - execute command"""
+        try:
+            # Confirmation dialog
+            reply = QMessageBox.question(
+                self,
+                "Ejecutar Comando",
+                f"¿Ejecutar el siguiente comando?\n\n{command}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                # Execute command in shell
+                if command.strip():
+                    # Run command in background without waiting
+                    subprocess.Popen(
+                        command,
+                        shell=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    )
+                    logger.info(f"Executing command: {command}")
+
+                    # Show feedback
+                    QMessageBox.information(
+                        self,
+                        "Comando Ejecutado",
+                        f"Comando ejecutado:\n{command}"
+                    )
+        except Exception as e:
+            logger.error(f"Error executing command {command}: {e}")
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo ejecutar el comando:\n{command}\n\nError: {str(e)}"
+            )
+
+    def on_path_button_clicked(self, path: str):
+        """Handle PATH button click - open file or folder"""
+        try:
+            # Check if path exists
+            if not os.path.exists(path):
+                QMessageBox.warning(
+                    self,
+                    "Ruta No Encontrada",
+                    f"La ruta no existe:\n{path}"
+                )
+                return
+
+            # Open with default application
+            if os.name == 'nt':  # Windows
+                os.startfile(path)
+            elif os.name == 'posix':  # Linux/Mac
+                subprocess.Popen(['xdg-open', path])
+
+            logger.info(f"Opening path: {path}")
+
+        except Exception as e:
+            logger.error(f"Error opening path {path}: {e}")
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo abrir la ruta:\n{path}\n\nError: {str(e)}"
+            )
 
     # ========== HELPERS ==========
 
