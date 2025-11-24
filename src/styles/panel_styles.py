@@ -63,7 +63,7 @@ class PanelStyles:
     ITEM_SPACING = 3
 
     # Items
-    ITEM_HEIGHT = 32
+    ITEM_HEIGHT = 42
     ITEM_PADDING_V = 6
     ITEM_PADDING_H = 10
     ITEM_BORDER_RADIUS = 4
