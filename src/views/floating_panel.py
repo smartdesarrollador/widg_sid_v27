@@ -267,7 +267,7 @@ class FloatingPanel(QWidget):
         filters_button_layout.addStretch()
 
         # Botón Copiar Todo
-        self.copy_all_button = QPushButton("📋 Copiar Todo")
+        self.copy_all_button = QPushButton("📋")
         self.copy_all_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.copy_all_button.setStyleSheet(f"""
             QPushButton {{
@@ -1128,20 +1128,9 @@ class FloatingPanel(QWidget):
         self.move(panel_x, panel_y)
         logger.debug(f"Positioned floating panel at ({panel_x}, {panel_y})")
 
-    def mousePressEvent(self, event):
-        """Handle mouse press for dragging (resizing is handled by PanelResizer)"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            # Start dragging (only if not on resize edge - PanelResizer will handle that)
-            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
-
-    def mouseMoveEvent(self, event):
-        """Handle mouse move for dragging (resizing is handled by PanelResizer)"""
-        if event.buttons() == Qt.MouseButton.LeftButton:
-            # Only drag if not resizing
-            if not self.panel_resizer.is_resizing:
-                self.move(event.globalPosition().toPoint() - self.drag_position)
-                event.accept()
+    # mousePressEvent y mouseMoveEvent no están definidos aquí
+    # porque PanelResizer maneja todo a través de su eventFilter.
+    # El eventFilter detecta si estás en un borde (resize) o en el centro (drag).
 
     def on_panel_resized(self, width: int, height: int):
         """Handle panel resize completion from PanelResizer"""

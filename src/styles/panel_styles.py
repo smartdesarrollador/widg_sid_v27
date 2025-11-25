@@ -80,7 +80,7 @@ class PanelStyles:
     SCROLLBAR_WIDTH = 4
 
     # Resize handle
-    RESIZE_HANDLE_SIZE = 8
+    RESIZE_HANDLE_SIZE = 12
 
     # ==================== TIPOGRAFÍA ====================
 

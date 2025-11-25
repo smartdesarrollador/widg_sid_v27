@@ -75,6 +75,10 @@ class PanelResizer(QObject):
         self.drag_start_pos = QPoint()
         self.drag_start_geometry = None
 
+        # Estado del drag (mover ventana)
+        self.is_dragging = False
+        self.drag_offset = QPoint()
+
         # Instalar event filter en el widget
         self.widget.installEventFilter(self)
         self.widget.setMouseTracking(True)
@@ -112,11 +116,15 @@ class PanelResizer(QObject):
             event: Evento de movimiento del mouse
 
         Returns:
-            True si se está redimensionando
+            True si se está redimensionando o arrastrando
         """
         if self.is_resizing:
             # Redimensionar el panel
             self._resize_panel(event.globalPosition().toPoint())
+            return True
+        elif self.is_dragging:
+            # Mover el panel
+            self.widget.move(event.globalPosition().toPoint() - self.drag_offset)
             return True
         else:
             # Actualizar cursor según posición
@@ -132,7 +140,7 @@ class PanelResizer(QObject):
             event: Evento de clic del mouse
 
         Returns:
-            True si se inició redimensionamiento
+            True si se inició redimensionamiento o drag
         """
         if event.button() == Qt.MouseButton.LeftButton:
             edge = self._get_resize_edge(event.pos())
@@ -142,6 +150,11 @@ class PanelResizer(QObject):
                 self.resize_edge = edge
                 self.drag_start_pos = event.globalPosition().toPoint()
                 self.drag_start_geometry = self.widget.geometry()
+                return True
+            else:
+                # No estamos en un borde, iniciar drag
+                self.is_dragging = True
+                self.drag_offset = event.globalPosition().toPoint() - self.widget.frameGeometry().topLeft()
                 return True
 
         return False
@@ -154,22 +167,28 @@ class PanelResizer(QObject):
             event: Evento de liberación del mouse
 
         Returns:
-            True si se completó redimensionamiento
+            True si se completó redimensionamiento o drag
         """
-        if event.button() == Qt.MouseButton.LeftButton and self.is_resizing:
-            # Finalizar redimensionamiento
-            self.is_resizing = False
-            self.resize_edge = ResizeEdge.NONE
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.is_resizing:
+                # Finalizar redimensionamiento
+                self.is_resizing = False
+                self.resize_edge = ResizeEdge.NONE
 
-            # Limpiar tooltip de dimensiones
-            self.widget.setToolTip("")
+                # Limpiar tooltip de dimensiones
+                self.widget.setToolTip("")
 
-            # Emitir señal con nuevas dimensiones
-            self.resized.emit(self.widget.width(), self.widget.height())
+                # Emitir señal con nuevas dimensiones
+                self.resized.emit(self.widget.width(), self.widget.height())
 
-            # Restaurar cursor
-            self._update_cursor(self._get_resize_edge(event.pos()))
-            return True
+                # Restaurar cursor
+                self._update_cursor(self._get_resize_edge(event.pos()))
+                return True
+            elif self.is_dragging:
+                # Finalizar drag
+                self.is_dragging = False
+                self.drag_offset = QPoint()
+                return True
 
         return False
 
