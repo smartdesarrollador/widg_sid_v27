@@ -9,7 +9,7 @@ Shows buttons for:
 - Browser (🌐)
 - Category Filter (📂)
 """
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCursor
 import sys
@@ -51,8 +51,8 @@ class QuickAccessPanel(QWidget):
             Qt.WindowType.FramelessWindowHint
         )
 
-        # Fixed size for panel (increased for more buttons)
-        self.setFixedSize(220, 450)
+        # Fixed size for panel (adjusted for vertical layout)
+        self.setFixedSize(220, 500)
 
         # Window opacity
         self.setWindowOpacity(0.95)
@@ -72,9 +72,12 @@ class QuickAccessPanel(QWidget):
         # Main layout
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(8)
+        main_layout.setSpacing(5)
 
-        # Header
+        # Header with title and close button
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(5)
+
         header = QLabel("⚡ Acceso Rápido")
         header.setStyleSheet("""
             QLabel {
@@ -85,39 +88,11 @@ class QuickAccessPanel(QWidget):
                 padding: 5px;
             }
         """)
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(header)
+        header_layout.addWidget(header)
 
-        # Grid layout for buttons (2 columns)
-        grid_layout = QGridLayout()
-        grid_layout.setSpacing(8)
-        grid_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Create buttons
-        buttons_config = [
-            ("🔍⚡", "Búsqueda Avanzada", self.on_advanced_search_clicked, 0, 0),
-            ("🤖", "IA Bulk", self.on_ai_bulk_clicked, 0, 1),
-            ("🤖📊", "IA Tabla", self.on_ai_table_clicked, 1, 0),
-            ("⚙️➕", "Crear Proceso", self.on_create_process_clicked, 1, 1),
-            ("⚙️📋", "Ver Procesos", self.on_view_processes_clicked, 2, 0),
-            ("📊", "Crear Tabla", self.on_table_creator_clicked, 2, 1),
-            ("📋", "Tablas", self.on_tables_manager_clicked, 3, 0),
-            ("⭐", "Favoritos", self.on_favorites_clicked, 3, 1),
-            ("📊", "Estadísticas", self.on_stats_clicked, 4, 0),
-            ("🧩", "Gestor de Componentes", self.on_component_manager_clicked, 4, 1),
-            ("📂", "Filtros", self.on_category_filter_clicked, 5, 0),
-            ("🗂️", "Dashboard", self.on_dashboard_clicked, 5, 1),
-            ("📌", "Paneles", self.on_pinned_panels_clicked, 6, 0),
-        ]
-
-        for icon, tooltip, handler, row, col in buttons_config:
-            button = self.create_action_button(icon, tooltip, handler)
-            grid_layout.addWidget(button, row, col)
-
-        main_layout.addLayout(grid_layout)
-
-        # Close button
-        close_btn = QPushButton("✕ Cerrar")
+        # Close button (small, top right)
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(25, 25)
         close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         close_btn.setStyleSheet("""
             QPushButton {
@@ -125,8 +100,7 @@ class QuickAccessPanel(QWidget):
                 color: #ffffff;
                 border: 1px solid #3d3d3d;
                 border-radius: 4px;
-                padding: 6px;
-                font-size: 9pt;
+                font-size: 10pt;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -135,21 +109,47 @@ class QuickAccessPanel(QWidget):
             }
         """)
         close_btn.clicked.connect(self.hide)
-        main_layout.addWidget(close_btn)
+        header_layout.addWidget(close_btn)
 
-    def create_action_button(self, icon: str, tooltip: str, handler):
-        """Create a styled action button"""
-        button = QPushButton(icon)
-        button.setFixedSize(95, 50)
-        button.setToolTip(tooltip)
+        main_layout.addLayout(header_layout)
+
+        # Buttons config (icon, label, handler)
+        buttons_config = [
+            ("🔍⚡", "Búsqueda Avanzada", self.on_advanced_search_clicked),
+            ("🤖", "IA Bulk", self.on_ai_bulk_clicked),
+            ("🤖📊", "IA Tabla", self.on_ai_table_clicked),
+            ("⚙️➕", "Crear Proceso", self.on_create_process_clicked),
+            ("⚙️📋", "Ver Procesos", self.on_view_processes_clicked),
+            ("📊", "Crear Tabla", self.on_table_creator_clicked),
+            ("📋", "Gestor de Tablas", self.on_tables_manager_clicked),
+            ("⭐", "Favoritos", self.on_favorites_clicked),
+            ("📊", "Estadísticas", self.on_stats_clicked),
+            ("🧩", "Componentes", self.on_component_manager_clicked),
+            ("📂", "Filtros", self.on_category_filter_clicked),
+            ("🗂️", "Dashboard", self.on_dashboard_clicked),
+            ("📌", "Paneles Anclados", self.on_pinned_panels_clicked),
+        ]
+
+        # Create buttons in rows
+        for icon, label, handler in buttons_config:
+            row_widget = self.create_action_row(icon, label, handler)
+            main_layout.addWidget(row_widget)
+
+    def create_action_row(self, icon: str, label: str, handler):
+        """Create a button with icon and text"""
+        # Button with icon and text
+        button = QPushButton(f"{icon}  {label}")
+        button.setFixedHeight(32)
         button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         button.setStyleSheet("""
             QPushButton {
                 background-color: #2d2d2d;
                 color: #ffffff;
                 border: 1px solid #3d3d3d;
-                border-radius: 6px;
-                font-size: 20pt;
+                border-radius: 4px;
+                font-size: 10pt;
+                text-align: left;
+                padding-left: 10px;
             }
             QPushButton:hover {
                 background: qlineargradient(
