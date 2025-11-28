@@ -148,14 +148,16 @@ class ImageGalleryController(QObject):
         Resolver rutas relativas a absolutas para una lista de imágenes
 
         Args:
-            images: Lista de dicts con rutas relativas en 'content'
+            images: Lista de dicts con rutas relativas en 'original_filename'
 
         Returns:
             Lista de dicts con rutas absolutas en 'content' y relativas en 'relative_path'
         """
         for image in images:
-            if 'content' in image:
-                relative_path = image['content']
+            # Usar original_filename si existe, sino content como fallback
+            relative_path = image.get('original_filename') or image.get('content')
+
+            if relative_path:
                 absolute_path = self._resolve_image_path(relative_path)
 
                 # Guardar ambas rutas

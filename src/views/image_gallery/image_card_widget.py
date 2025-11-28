@@ -97,7 +97,11 @@ class ImageCardWidget(QWidget):
         self.thumbnail_container = self._create_thumbnail_container()
         main_layout.addWidget(self.thumbnail_container)
 
-        # Nombre del item
+        # Nombre del item con icono de URL si tiene preview_url
+        name_layout = QHBoxLayout()
+        name_layout.setSpacing(4)
+        name_layout.setContentsMargins(0, 0, 0, 0)
+
         self.name_label = QLabel(self.item_data.get('label', 'Sin nombre'))
         self.name_label.setWordWrap(True)
         self.name_label.setMaximumHeight(40)
@@ -107,7 +111,18 @@ class ImageCardWidget(QWidget):
         name_font.setBold(True)
         self.name_label.setFont(name_font)
         self.name_label.setStyleSheet("color: #ffffff; background: transparent;")
-        main_layout.addWidget(self.name_label)
+        name_layout.addWidget(self.name_label)
+
+        # Icono de URL si tiene preview_url
+        if self.item_data.get('preview_url'):
+            url_icon = QLabel("🌐")
+            url_icon.setStyleSheet("color: #007acc; font-size: 10pt; background: transparent;")
+            url_icon.setToolTip(f"Click para abrir: {self.item_data.get('preview_url')}")
+            url_icon.setFixedSize(20, 20)
+            name_layout.addWidget(url_icon)
+
+        name_layout.addStretch()
+        main_layout.addLayout(name_layout)
 
         # Categoría
         category_name = self.item_data.get('category_name', 'Sin categoría')
@@ -309,9 +324,18 @@ class ImageCardWidget(QWidget):
     def mousePressEvent(self, event):
         """Override mouse press para emitir señal clicked"""
         if event.button() == Qt.MouseButton.LeftButton:
-            # Solo emitir si no se hizo click en overlay
-            if not self.is_hovered or not self.overlay.isVisible():
-                self.clicked.emit(self.item_data)
+            # Verificar si el click fue en algún botón del overlay
+            widget_at_pos = self.childAt(event.pos())
+
+            # Si es un botón (QPushButton), dejar que el botón maneje el click
+            from PyQt6.QtWidgets import QPushButton
+            if isinstance(widget_at_pos, QPushButton):
+                # No emitir señal, dejar que el botón maneje el evento
+                super().mousePressEvent(event)
+                return
+
+            # Si no es un botón, emitir señal clicked
+            self.clicked.emit(self.item_data)
         super().mousePressEvent(event)
 
     def _on_preview_clicked(self):

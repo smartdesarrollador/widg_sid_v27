@@ -304,7 +304,8 @@ class ScreenshotController(QObject):
             int: ID del item creado o None si falla
         """
         try:
-            filepath = item_data['content']
+            # El filepath está en original_filename o content
+            filepath = item_data.get('original_filename') or item_data.get('content')
 
             # Extraer metadatos del archivo
             metadata = self.screenshot_manager.get_screenshot_metadata(filepath)
@@ -313,11 +314,15 @@ class ScreenshotController(QObject):
                 logger.error("Failed to extract file metadata")
                 return None
 
+            # Obtener solo el nombre del archivo (relativo)
+            import os
+            filename = os.path.basename(filepath)
+
             # Crear item con datos del diálogo
             item_id = self.db.add_item(
                 category_id=item_data['category_id'],
                 label=item_data['label'],
-                content=filepath,
+                content=filename,  # Solo nombre de archivo relativo
                 item_type='PATH',
                 description=item_data.get('description'),
                 tags=item_data.get('tags', []),
@@ -325,8 +330,9 @@ class ScreenshotController(QObject):
                 file_size=metadata.get('file_size'),
                 file_type=metadata.get('file_type'),
                 file_extension=metadata.get('file_extension'),
-                original_filename=metadata.get('original_filename'),
-                file_hash=metadata.get('file_hash')
+                original_filename=filename,  # Solo nombre de archivo relativo
+                file_hash=metadata.get('file_hash'),
+                preview_url=item_data.get('preview_url')  # URL opcional
             )
 
             logger.info(f"Screenshot item created from dialog: ID {item_id}")

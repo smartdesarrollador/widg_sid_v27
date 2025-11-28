@@ -390,8 +390,26 @@ class ImageGalleryWindow(QDialog):
             item_data: Datos del item
         """
         logger.info(f"Card clicked: {item_data.get('label')}")
-        # Emitir señal para notificar a otros componentes
-        self.image_selected.emit(item_data)
+
+        # Verificar si el item tiene URL en preview_url
+        preview_url = item_data.get('preview_url')
+
+        if preview_url:
+            # Tiene URL, abrirla en el navegador
+            logger.info(f"Opening URL: {preview_url}")
+            import webbrowser
+            try:
+                webbrowser.open(preview_url)
+            except Exception as e:
+                logger.error(f"Error opening URL: {e}")
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    f"No se pudo abrir la URL:\n{preview_url}"
+                )
+        else:
+            # No tiene URL, solo emitir señal
+            self.image_selected.emit(item_data)
 
     def _on_preview_requested(self, item_data: dict):
         """

@@ -212,6 +212,13 @@ class SaveScreenshotDialog(QDialog):
         self.tags_input.setPlaceholderText("Separados por comas: bug, login, error")
         item_layout.addRow("Tags:", self.tags_input)
 
+        # Campo: URL (opcional)
+        self.url_input = QLineEdit()
+        self.url_input.setPlaceholderText("URL opcional (se abrirá al hacer clic en la imagen)")
+        url_label = QLabel("URL:")
+        url_label.setToolTip("Opcional: URL que se abrirá al hacer clic en la imagen en la galería")
+        item_layout.addRow(url_label, self.url_input)
+
         item_group.setLayout(item_layout)
         layout.addWidget(item_group)
 
@@ -299,16 +306,20 @@ class SaveScreenshotDialog(QDialog):
         tags_text = self.tags_input.text().strip()
         tags = [tag.strip() for tag in tags_text.split(',') if tag.strip()]
         is_favorite = self.favorite_checkbox.isChecked()
+        url = self.url_input.text().strip()
 
         # Construir datos del item
+        # URL se guarda en preview_url, content siempre tiene el filename
         self.item_data = {
             'label': name,
-            'content': self.screenshot_path,
+            'content': self.screenshot_path,  # Siempre el path del screenshot
             'item_type': 'PATH',
             'category_id': category_id,
             'description': description if description else None,
             'tags': tags,
-            'is_favorite': is_favorite
+            'is_favorite': is_favorite,
+            'preview_url': url if url else None,  # URL opcional en preview_url
+            'original_filename': self.screenshot_path  # Path completo para extraer metadata
         }
 
         # Emitir señal y cerrar
