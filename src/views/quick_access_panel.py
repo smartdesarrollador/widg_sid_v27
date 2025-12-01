@@ -39,6 +39,7 @@ class QuickAccessPanel(QWidget):
     component_manager_clicked = pyqtSignal()
     web_static_create_clicked = pyqtSignal()
     image_gallery_clicked = pyqtSignal()  # NEW: Image Gallery
+    projects_clicked = pyqtSignal()  # NEW: Projects Manager
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -119,7 +120,8 @@ class QuickAccessPanel(QWidget):
         # Buttons config (icon, label, handler)
         buttons_config = [
             ("🔍⚡", "Búsqueda Avanzada", self.on_advanced_search_clicked),
-            ("🖼️", "Galería de Imágenes", self.on_image_gallery_clicked),  # NEW
+            ("📁", "Proyectos", self.on_projects_clicked),  # NEW: Projects Manager
+            ("🖼️", "Galería de Imágenes", self.on_image_gallery_clicked),
             ("🤖", "IA Bulk", self.on_ai_bulk_clicked),
             ("🤖📊", "IA Tabla", self.on_ai_table_clicked),
             ("⚙️➕", "Crear Proceso", self.on_create_process_clicked),
@@ -130,8 +132,8 @@ class QuickAccessPanel(QWidget):
             ("⭐", "Favoritos", self.on_favorites_clicked),
             ("📊", "Estadísticas", self.on_stats_clicked),
             ("🧩", "Componentes", self.on_component_manager_clicked),
-            ("📁", "Categorías", self.on_category_manager_clicked),  # NEW
-            ("📂", "Filtros", self.on_category_filter_clicked),
+            ("📂", "Categorías", self.on_category_manager_clicked),
+            ("📁", "Filtros", self.on_category_filter_clicked),
             ("🗂️", "Dashboard", self.on_dashboard_clicked),
             ("📌", "Paneles Anclados", self.on_pinned_panels_clicked),
         ]
@@ -256,6 +258,11 @@ class QuickAccessPanel(QWidget):
     def on_image_gallery_clicked(self):
         """Handle image gallery button click"""
         self.image_gallery_clicked.emit()
+        self.hide()
+
+    def on_projects_clicked(self):
+        """Handle projects button click"""
+        self.projects_clicked.emit()
         self.hide()
 
     def position_near_button(self, button_widget):

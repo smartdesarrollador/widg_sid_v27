@@ -27,17 +27,47 @@ class QuickCreateDialog(QDialog):
 
     # Signal emitted when data changes (item or category created)
     data_changed = pyqtSignal()
+    item_created_signal = pyqtSignal(int, int)  # item_id, category_id
 
     def __init__(self, controller=None, parent=None):
         """
         Initialize quick create dialog
 
         Args:
-            controller: MainController instance
+            controller: MainController instance OR DBManager instance
             parent: Parent widget
         """
         super().__init__(parent)
-        self.controller = controller
+
+        # Soportar tanto controller como db_manager directo
+        from database.db_manager import DBManager
+
+        if isinstance(controller, DBManager):
+            # Se pasó un DBManager directo - crear mock controller
+            self.db = controller
+
+            # Crear objeto mock para que ItemEditorDialog funcione
+            class MockConfigManager:
+                def __init__(self, db):
+                    self.db = db
+
+            class MockController:
+                def __init__(self, db):
+                    self.config_manager = MockConfigManager(db)
+
+                def invalidate_filter_cache(self):
+                    pass  # No-op en contexto de proyecto
+
+            self.controller = MockController(controller)
+        else:
+            # Se pasó un controller (comportamiento original)
+            self.controller = controller
+            self.db = controller.config_manager.db if controller else None
+
+        # Rastrear último item/categoría creado
+        self.last_created_item_id = None
+        self.last_created_category_id = None
+
         self.init_ui()
 
     def init_ui(self):
@@ -118,17 +148,17 @@ class QuickCreateDialog(QDialog):
 
     def create_item(self):
         """Create a new item - first select category"""
-        if not self.controller:
+        if not self.db:
             QMessageBox.warning(
                 self,
                 "Error",
-                "No se pudo acceder al controlador."
+                "No se pudo acceder a la base de datos."
             )
             return
 
         try:
             # Get all categories
-            categories = self.controller.config_manager.db.get_categories()
+            categories = self.db.get_categories()
 
             if not categories:
                 QMessageBox.information(
@@ -367,7 +397,7 @@ class QuickCreateDialog(QDialog):
             logger.info(f"Creating new category: {name} with tags: {tags}")
 
             # Save directly to database to get real ID
-            category_id = self.controller.config_manager.db.add_category(
+            category_id = self.db.add_category(
                 name=name,
                 icon="📁",  # Default icon
                 is_predefined=False,
@@ -408,4 +438,21 @@ class QuickCreateDialog(QDialog):
     def on_item_created(self, category_id: str):
         """Handle item created signal"""
         logger.info(f"Item created in category {category_id}")
+
+        # Obtener el último item creado en esta categoría
+        try:
+            cat_id = int(category_id)
+            items = self.db.get_items_by_category(cat_id)
+            if items:
+                # El último item en la lista es el recién creado
+                last_item = items[-1]
+                self.last_created_item_id = last_item['id']
+                self.last_created_category_id = cat_id
+                logger.info(f"Last created item ID: {self.last_created_item_id}")
+
+                # Emitir señal con el item_id y category_id
+                self.item_created_signal.emit(self.last_created_item_id, cat_id)
+        except Exception as e:
+            logger.error(f"Error getting last created item: {e}")
+
         self.data_changed.emit()

@@ -93,6 +93,9 @@ class Sidebar(QWidget):
     # Signal emitted when web static create button is clicked
     web_static_create_clicked = pyqtSignal()
 
+    # Signal emitted when projects button is clicked
+    projects_clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.category_buttons = {}
@@ -821,6 +824,7 @@ class Sidebar(QWidget):
                 self.quick_access_panel.component_manager_clicked.connect(lambda: self.component_manager_clicked.emit())
                 self.quick_access_panel.web_static_create_clicked.connect(lambda: self.web_static_create_clicked.emit())
                 self.quick_access_panel.image_gallery_clicked.connect(lambda: self.image_gallery_clicked.emit())
+                self.quick_access_panel.projects_clicked.connect(lambda: self.projects_clicked.emit())
 
         # Toggle visibility
         if self.quick_access_panel.isVisible():

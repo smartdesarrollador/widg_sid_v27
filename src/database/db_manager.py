@@ -5452,6 +5452,728 @@ class DBManager:
         except Exception as e:
             logger.error(f"Error resetting panel settings: {e}")
 
+    # ==================== PROYECTOS ====================
+
+    def add_project(self, name: str, description: str = "", color: str = "#3498db",
+                    icon: str = "📁") -> int:
+        """
+        Crea un nuevo proyecto
+
+        Args:
+            name: Nombre del proyecto (único)
+            description: Descripción del proyecto
+            color: Color del proyecto en formato hex
+            icon: Emoji icono del proyecto
+
+        Returns:
+            ID del proyecto creado
+        """
+        try:
+            with self.transaction() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO proyectos (name, description, color, icon)
+                    VALUES (?, ?, ?, ?)
+                """, (name, description, color, icon))
+                project_id = cursor.lastrowid
+
+            logger.info(f"Proyecto creado: {name} (ID: {project_id})")
+            return project_id
+
+        except sqlite3.IntegrityError:
+            logger.error(f"Ya existe un proyecto con el nombre: {name}")
+            raise ValueError(f"Ya existe un proyecto con el nombre '{name}'")
+        except Exception as e:
+            logger.error(f"Error creando proyecto: {e}")
+            raise
+
+    def get_project(self, project_id: int) -> Optional[Dict]:
+        """
+        Obtiene un proyecto por su ID
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Diccionario con datos del proyecto o None si no existe
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute("""
+                SELECT id, name, description, color, icon, is_active,
+                       created_at, updated_at
+                FROM proyectos
+                WHERE id = ?
+            """, (project_id,))
+
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+        except Exception as e:
+            logger.error(f"Error obteniendo proyecto {project_id}: {e}")
+            return None
+
+    def get_all_projects(self, active_only: bool = True) -> List[Dict]:
+        """
+        Obtiene todos los proyectos
+
+        Args:
+            active_only: Si True, solo retorna proyectos activos
+
+        Returns:
+            Lista de diccionarios con datos de proyectos
+        """
+        try:
+            conn = self.connect()
+            query = """
+                SELECT id, name, description, color, icon, is_active,
+                       created_at, updated_at
+                FROM proyectos
+            """
+
+            if active_only:
+                query += " WHERE is_active = 1"
+
+            query += " ORDER BY created_at DESC"
+
+            cursor = conn.execute(query)
+            return [dict(row) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.error(f"Error obteniendo proyectos: {e}")
+            return []
+
+    def update_project(self, project_id: int, **kwargs) -> bool:
+        """
+        Actualiza un proyecto
+
+        Args:
+            project_id: ID del proyecto
+            **kwargs: Campos a actualizar (name, description, color, icon, is_active)
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        allowed_fields = {'name', 'description', 'color', 'icon', 'is_active'}
+        update_fields = {k: v for k, v in kwargs.items() if k in allowed_fields}
+
+        if not update_fields:
+            logger.warning("No hay campos válidos para actualizar")
+            return False
+
+        try:
+            # Agregar campo updated_at
+            update_fields['updated_at'] = datetime.now().isoformat()
+
+            set_clause = ", ".join([f"{field} = ?" for field in update_fields.keys()])
+            values = list(update_fields.values()) + [project_id]
+
+            with self.transaction() as conn:
+                conn.execute(f"""
+                    UPDATE proyectos
+                    SET {set_clause}
+                    WHERE id = ?
+                """, values)
+
+            logger.info(f"Proyecto {project_id} actualizado")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error actualizando proyecto {project_id}: {e}")
+            return False
+
+    def delete_project(self, project_id: int) -> bool:
+        """
+        Elimina un proyecto y todas sus relaciones
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            True si se eliminó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                # Las relaciones y componentes se eliminan automáticamente por CASCADE
+                conn.execute("DELETE FROM proyectos WHERE id = ?", (project_id,))
+
+            logger.info(f"Proyecto {project_id} eliminado")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error eliminando proyecto {project_id}: {e}")
+            return False
+
+    def toggle_project_active(self, project_id: int) -> bool:
+        """
+        Alterna el estado activo/inactivo de un proyecto
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Nuevo estado (True = activo, False = inactivo)
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute("""
+                SELECT is_active FROM proyectos WHERE id = ?
+            """, (project_id,))
+
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            new_state = not bool(row['is_active'])
+
+            with self.transaction() as conn:
+                conn.execute("""
+                    UPDATE proyectos SET is_active = ?, updated_at = ?
+                    WHERE id = ?
+                """, (new_state, datetime.now().isoformat(), project_id))
+
+            logger.info(f"Proyecto {project_id} estado: {new_state}")
+            return new_state
+
+        except Exception as e:
+            logger.error(f"Error alternando estado del proyecto {project_id}: {e}")
+            return False
+
+    # ==================== PROJECT RELATIONS ====================
+
+    def add_project_relation(self, project_id: int, entity_type: str, entity_id: int,
+                            description: str = "", order_index: int = 0) -> int:
+        """
+        Agrega una relación entre proyecto y entidad
+
+        Args:
+            project_id: ID del proyecto
+            entity_type: Tipo de entidad ('tag', 'process', 'list', 'table', 'category', 'item')
+            entity_id: ID de la entidad
+            description: Descripción contextual del elemento en el proyecto
+            order_index: Índice de ordenamiento
+
+        Returns:
+            ID de la relación creada
+        """
+        try:
+            with self.transaction() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO project_relations
+                    (project_id, entity_type, entity_id, description, order_index)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (project_id, entity_type, entity_id, description, order_index))
+
+                relation_id = cursor.lastrowid
+
+            logger.info(f"Relación creada: {entity_type}#{entity_id} -> Proyecto#{project_id}")
+            return relation_id
+
+        except sqlite3.IntegrityError:
+            logger.error(f"La relación ya existe: {entity_type}#{entity_id} en proyecto {project_id}")
+            raise ValueError(f"El elemento ya está en el proyecto")
+        except Exception as e:
+            logger.error(f"Error creando relación: {e}")
+            raise
+
+    def remove_project_relation(self, relation_id: int) -> bool:
+        """
+        Elimina una relación por su ID
+
+        Args:
+            relation_id: ID de la relación
+
+        Returns:
+            True si se eliminó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute("DELETE FROM project_relations WHERE id = ?", (relation_id,))
+
+            logger.info(f"Relación {relation_id} eliminada")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error eliminando relación {relation_id}: {e}")
+            return False
+
+    def remove_project_relation_by_entity(self, project_id: int, entity_type: str,
+                                         entity_id: int) -> bool:
+        """
+        Elimina una relación por proyecto y entidad
+
+        Args:
+            project_id: ID del proyecto
+            entity_type: Tipo de entidad
+            entity_id: ID de la entidad
+
+        Returns:
+            True si se eliminó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute("""
+                    DELETE FROM project_relations
+                    WHERE project_id = ? AND entity_type = ? AND entity_id = ?
+                """, (project_id, entity_type, entity_id))
+
+            logger.info(f"Relación eliminada: {entity_type}#{entity_id} del proyecto {project_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error eliminando relación: {e}")
+            return False
+
+    def get_project_relations(self, project_id: int, entity_type: str = None) -> List[Dict]:
+        """
+        Obtiene las relaciones de un proyecto
+
+        Args:
+            project_id: ID del proyecto
+            entity_type: Si se especifica, filtra por tipo de entidad
+
+        Returns:
+            Lista de diccionarios con datos de las relaciones
+        """
+        try:
+            conn = self.connect()
+            query = """
+                SELECT id, project_id, entity_type, entity_id, description, order_index, created_at
+                FROM project_relations
+                WHERE project_id = ?
+            """
+            params = [project_id]
+
+            if entity_type:
+                query += " AND entity_type = ?"
+                params.append(entity_type)
+
+            query += " ORDER BY order_index ASC"
+
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.error(f"Error obteniendo relaciones del proyecto {project_id}: {e}")
+            return []
+
+    def get_projects_by_entity(self, entity_type: str, entity_id: int) -> List[Dict]:
+        """
+        Obtiene todos los proyectos que contienen una entidad específica
+
+        Args:
+            entity_type: Tipo de entidad
+            entity_id: ID de la entidad
+
+        Returns:
+            Lista de proyectos que contienen la entidad
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute("""
+                SELECT p.* FROM proyectos p
+                INNER JOIN project_relations pr ON p.id = pr.project_id
+                WHERE pr.entity_type = ? AND pr.entity_id = ?
+                AND p.is_active = 1
+                ORDER BY p.name
+            """, (entity_type, entity_id))
+
+            return [dict(row) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.error(f"Error obteniendo proyectos para {entity_type}#{entity_id}: {e}")
+            return []
+
+    def update_relation_description(self, relation_id: int, description: str) -> bool:
+        """
+        Actualiza la descripción de una relación
+
+        Args:
+            relation_id: ID de la relación
+            description: Nueva descripción
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute("""
+                    UPDATE project_relations SET description = ?
+                    WHERE id = ?
+                """, (description, relation_id))
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error actualizando descripción de relación {relation_id}: {e}")
+            return False
+
+    def update_relation_order(self, relation_id: int, new_order_index: int) -> bool:
+        """
+        Actualiza el orden de una relación
+
+        Args:
+            relation_id: ID de la relación
+            new_order_index: Nuevo índice de orden
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute("""
+                    UPDATE project_relations SET order_index = ?
+                    WHERE id = ?
+                """, (new_order_index, relation_id))
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error actualizando orden de relación {relation_id}: {e}")
+            return False
+
+    # ==================== PROJECT COMPONENTS ====================
+
+    def add_project_component(self, project_id: int, component_type: str,
+                             content: str = "", order_index: int = 0) -> int:
+        """
+        Agrega un componente estructural al proyecto
+
+        Args:
+            project_id: ID del proyecto
+            component_type: Tipo ('divider', 'comment', 'alert', 'note')
+            content: Contenido del componente
+            order_index: Índice de ordenamiento
+
+        Returns:
+            ID del componente creado
+        """
+        try:
+            with self.transaction() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO project_components
+                    (project_id, component_type, content, order_index)
+                    VALUES (?, ?, ?, ?)
+                """, (project_id, component_type, content, order_index))
+
+                component_id = cursor.lastrowid
+
+            logger.info(f"Componente {component_type} creado en proyecto {project_id}")
+            return component_id
+
+        except Exception as e:
+            logger.error(f"Error creando componente: {e}")
+            raise
+
+    def remove_project_component(self, component_id: int) -> bool:
+        """
+        Elimina un componente
+
+        Args:
+            component_id: ID del componente
+
+        Returns:
+            True si se eliminó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute("DELETE FROM project_components WHERE id = ?", (component_id,))
+
+            logger.info(f"Componente {component_id} eliminado")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error eliminando componente {component_id}: {e}")
+            return False
+
+    def get_project_components(self, project_id: int) -> List[Dict]:
+        """
+        Obtiene todos los componentes de un proyecto
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Lista de componentes ordenados por order_index
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute("""
+                SELECT id, project_id, component_type, content, order_index, created_at
+                FROM project_components
+                WHERE project_id = ?
+                ORDER BY order_index ASC
+            """, (project_id,))
+
+            return [dict(row) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.error(f"Error obteniendo componentes del proyecto {project_id}: {e}")
+            return []
+
+    def update_component_content(self, component_id: int, content: str) -> bool:
+        """
+        Actualiza el contenido de un componente
+
+        Args:
+            component_id: ID del componente
+            content: Nuevo contenido
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute("""
+                    UPDATE project_components SET content = ?
+                    WHERE id = ?
+                """, (content, component_id))
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error actualizando componente {component_id}: {e}")
+            return False
+
+    def update_component_order(self, component_id: int, new_order_index: int) -> bool:
+        """
+        Actualiza el orden de un componente
+
+        Args:
+            component_id: ID del componente
+            new_order_index: Nuevo índice de orden
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute("""
+                    UPDATE project_components SET order_index = ?
+                    WHERE id = ?
+                """, (new_order_index, component_id))
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error actualizando orden de componente {component_id}: {e}")
+            return False
+
+    # ==================== QUERIES COMBINADAS ====================
+
+    def get_project_content_ordered(self, project_id: int) -> List[Dict]:
+        """
+        Obtiene TODOS los elementos del proyecto (relaciones + componentes)
+        ordenados por order_index, permitiendo intercalar ambos tipos
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Lista combinada de relaciones y componentes ordenados
+        """
+        try:
+            conn = self.connect()
+
+            # Obtener relaciones
+            cursor = conn.execute("""
+                SELECT 'relation' as type, id, project_id, entity_type, entity_id,
+                       description, order_index, created_at, NULL as component_type, NULL as content
+                FROM project_relations
+                WHERE project_id = ?
+            """, (project_id,))
+            relations = [dict(row) for row in cursor.fetchall()]
+
+            # Obtener componentes
+            cursor = conn.execute("""
+                SELECT 'component' as type, id, project_id, NULL as entity_type, NULL as entity_id,
+                       NULL as description, order_index, created_at, component_type, content
+                FROM project_components
+                WHERE project_id = ?
+            """, (project_id,))
+            components = [dict(row) for row in cursor.fetchall()]
+
+            # Combinar y ordenar
+            all_items = relations + components
+            # Manejar None en order_index (tratarlo como 0)
+            all_items.sort(key=lambda x: x['order_index'] if x['order_index'] is not None else 0)
+
+            return all_items
+
+        except Exception as e:
+            logger.error(f"Error obteniendo contenido del proyecto {project_id}: {e}")
+            return []
+
+    def reorder_project_content(self, reordered_items: List[tuple]) -> bool:
+        """
+        Actualiza order_index de múltiples elementos (relaciones y componentes)
+
+        Args:
+            reordered_items: Lista de tuplas (type, id, new_order)
+                            type: 'relation' o 'component'
+                            id: ID del elemento
+                            new_order: Nuevo order_index
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                for item_type, item_id, new_order in reordered_items:
+                    if item_type == 'relation':
+                        conn.execute("""
+                            UPDATE project_relations SET order_index = ?
+                            WHERE id = ?
+                        """, (new_order, item_id))
+                    elif item_type == 'component':
+                        conn.execute("""
+                            UPDATE project_components SET order_index = ?
+                            WHERE id = ?
+                        """, (new_order, item_id))
+
+            logger.info(f"Reordenados {len(reordered_items)} elementos")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error reordenando elementos: {e}")
+            return False
+
+    def get_project_summary(self, project_id: int) -> Dict[str, int]:
+        """
+        Obtiene resumen estadístico del proyecto (conteo por tipo)
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Diccionario con conteo de cada tipo de entidad y componentes
+        """
+        try:
+            conn = self.connect()
+
+            summary = {
+                'tags': 0,
+                'processes': 0,
+                'lists': 0,
+                'tables': 0,
+                'categories': 0,
+                'items': 0,
+                'components': 0,
+                'total': 0
+            }
+
+            # Contar relaciones por tipo
+            cursor = conn.execute("""
+                SELECT entity_type, COUNT(*) as count
+                FROM project_relations
+                WHERE project_id = ?
+                GROUP BY entity_type
+            """, (project_id,))
+
+            for row in cursor.fetchall():
+                entity_type = row['entity_type']
+                count = row['count']
+                summary[entity_type + 's'] = count  # 'tag' -> 'tags'
+
+            # Contar componentes
+            cursor = conn.execute("""
+                SELECT COUNT(*) as count
+                FROM project_components
+                WHERE project_id = ?
+            """, (project_id,))
+
+            row = cursor.fetchone()
+            if row:
+                summary['components'] = row['count']
+
+            # Calcular total
+            summary['total'] = sum([v for k, v in summary.items() if k != 'total'])
+
+            return summary
+
+        except Exception as e:
+            logger.error(f"Error obteniendo resumen del proyecto {project_id}: {e}")
+            return {}
+
+    def search_projects(self, query: str) -> List[Dict]:
+        """
+        Busca proyectos por nombre o descripción
+
+        Args:
+            query: Texto a buscar
+
+        Returns:
+            Lista de proyectos que coinciden con la búsqueda
+        """
+        try:
+            conn = self.connect()
+            search_term = f"%{query}%"
+
+            cursor = conn.execute("""
+                SELECT id, name, description, color, icon, is_active, created_at, updated_at
+                FROM proyectos
+                WHERE (name LIKE ? OR description LIKE ?)
+                AND is_active = 1
+                ORDER BY name
+            """, (search_term, search_term))
+
+            return [dict(row) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.error(f"Error buscando proyectos: {e}")
+            return []
+
+    def get_entity_content_for_clipboard(self, entity_type: str, entity_id: int) -> str:
+        """
+        Obtiene el contenido de una entidad para copiar al portapapeles
+
+        Args:
+            entity_type: Tipo de entidad
+            entity_id: ID de la entidad
+
+        Returns:
+            Contenido de la entidad como string
+        """
+        try:
+            conn = self.connect()
+
+            if entity_type == 'item':
+                cursor = conn.execute("SELECT content FROM items WHERE id = ?", (entity_id,))
+                row = cursor.fetchone()
+                return row['content'] if row else ""
+
+            elif entity_type == 'tag':
+                cursor = conn.execute("SELECT name FROM item_tags WHERE id = ?", (entity_id,))
+                row = cursor.fetchone()
+                return row['name'] if row else ""
+
+            elif entity_type == 'list':
+                cursor = conn.execute("SELECT name FROM listas WHERE id = ?", (entity_id,))
+                row = cursor.fetchone()
+                return row['name'] if row else ""
+
+            elif entity_type == 'process':
+                cursor = conn.execute("SELECT name FROM processes WHERE id = ?", (entity_id,))
+                row = cursor.fetchone()
+                return row['name'] if row else ""
+
+            elif entity_type == 'table':
+                cursor = conn.execute("SELECT name FROM tables WHERE id = ?", (entity_id,))
+                row = cursor.fetchone()
+                return row['name'] if row else ""
+
+            elif entity_type == 'category':
+                cursor = conn.execute("SELECT name FROM categories WHERE id = ?", (entity_id,))
+                row = cursor.fetchone()
+                return row['name'] if row else ""
+
+            return ""
+
+        except Exception as e:
+            logger.error(f"Error obteniendo contenido de {entity_type}#{entity_id}: {e}")
+            return ""
+
     # ==================== Context Manager ====================
 
     def __enter__(self):
