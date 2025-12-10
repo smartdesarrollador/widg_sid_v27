@@ -8021,6 +8021,218 @@ class DBManager:
             logger.error(f"Error actualizando tags de componente {component_id}: {e}")
             return False
 
+    # ==================== ITEM DRAFTS (Creador Masivo) ====================
+
+    def save_item_draft(self, tab_id: str, data: dict) -> bool:
+        """
+        Guarda o actualiza un borrador de items
+
+        Args:
+            tab_id: UUID de la pestaña
+            data: Dict con campos del borrador
+
+        Returns:
+            True si se guardó exitosamente
+        """
+        try:
+            # Serializar listas a JSON
+            items_json = json.dumps(data.get('items', []))
+            item_tags_json = json.dumps(data.get('item_tags', []))
+            project_tags_json = json.dumps(data.get('project_element_tags', []))
+
+            with self.transaction() as conn:
+                conn.execute('''
+                    INSERT INTO item_drafts
+                    (tab_id, tab_name, project_id, area_id, category_id,
+                     create_as_list, list_name, item_tags_json,
+                     project_element_tags_json, items_json, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(tab_id) DO UPDATE SET
+                        tab_name = excluded.tab_name,
+                        project_id = excluded.project_id,
+                        area_id = excluded.area_id,
+                        category_id = excluded.category_id,
+                        create_as_list = excluded.create_as_list,
+                        list_name = excluded.list_name,
+                        item_tags_json = excluded.item_tags_json,
+                        project_element_tags_json = excluded.project_element_tags_json,
+                        items_json = excluded.items_json,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', (
+                    tab_id, data.get('tab_name', 'Sin título'),
+                    data.get('project_id'), data.get('area_id'), data.get('category_id'),
+                    data.get('create_as_list', False), data.get('list_name'),
+                    item_tags_json, project_tags_json, items_json
+                ))
+            logger.info(f"✅ Borrador guardado: {tab_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error guardando borrador {tab_id}: {e}")
+            return False
+
+    def get_all_item_drafts(self) -> List[dict]:
+        """
+        Obtiene todos los borradores ordenados por fecha de actualización
+
+        Returns:
+            Lista de borradores con datos deserializados
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute('''
+                SELECT * FROM item_drafts
+                ORDER BY updated_at DESC
+            ''')
+            rows = cursor.fetchall()
+
+            drafts = []
+            for row in rows:
+                draft = dict(row)
+                # Deserializar JSON
+                draft['items'] = json.loads(draft['items_json'])
+                draft['item_tags'] = json.loads(draft['item_tags_json'] or '[]')
+                draft['project_element_tags'] = json.loads(draft['project_element_tags_json'] or '[]')
+                drafts.append(draft)
+
+            logger.info(f"📂 Cargados {len(drafts)} borradores")
+            return drafts
+
+        except Exception as e:
+            logger.error(f"Error obteniendo borradores: {e}")
+            return []
+
+    def get_item_draft(self, tab_id: str) -> Optional[dict]:
+        """
+        Obtiene un borrador específico por tab_id
+
+        Args:
+            tab_id: UUID de la pestaña
+
+        Returns:
+            Dict con datos del borrador o None
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute(
+                'SELECT * FROM item_drafts WHERE tab_id = ?',
+                (tab_id,)
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            draft = dict(row)
+            # Deserializar JSON
+            draft['items'] = json.loads(draft['items_json'])
+            draft['item_tags'] = json.loads(draft['item_tags_json'] or '[]')
+            draft['project_element_tags'] = json.loads(draft['project_element_tags_json'] or '[]')
+
+            return draft
+
+        except Exception as e:
+            logger.error(f"Error obteniendo borrador {tab_id}: {e}")
+            return None
+
+    def delete_item_draft(self, tab_id: str) -> bool:
+        """
+        Elimina un borrador específico
+
+        Args:
+            tab_id: UUID de la pestaña
+
+        Returns:
+            True si se eliminó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute('DELETE FROM item_drafts WHERE tab_id = ?', (tab_id,))
+            logger.info(f"🗑️  Borrador eliminado: {tab_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error eliminando borrador {tab_id}: {e}")
+            return False
+
+    def clear_all_item_drafts(self) -> int:
+        """
+        Elimina todos los borradores
+
+        Returns:
+            Cantidad de borradores eliminados
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute('SELECT COUNT(*) as count FROM item_drafts')
+            count = cursor.fetchone()['count']
+
+            with self.transaction() as conn:
+                conn.execute('DELETE FROM item_drafts')
+
+            logger.info(f"🗑️  Eliminados {count} borradores")
+            return count
+
+        except Exception as e:
+            logger.error(f"Error limpiando borradores: {e}")
+            return 0
+
+    def get_drafts_by_category(self, category_id: int) -> List[dict]:
+        """
+        Obtiene borradores filtrados por categoría
+
+        Args:
+            category_id: ID de la categoría
+
+        Returns:
+            Lista de borradores de esa categoría
+        """
+        try:
+            conn = self.connect()
+            cursor = conn.execute('''
+                SELECT * FROM item_drafts
+                WHERE category_id = ?
+                ORDER BY updated_at DESC
+            ''', (category_id,))
+            rows = cursor.fetchall()
+
+            drafts = []
+            for row in rows:
+                draft = dict(row)
+                draft['items'] = json.loads(draft['items_json'])
+                draft['item_tags'] = json.loads(draft['item_tags_json'] or '[]')
+                draft['project_element_tags'] = json.loads(draft['project_element_tags_json'] or '[]')
+                drafts.append(draft)
+
+            return drafts
+
+        except Exception as e:
+            logger.error(f"Error obteniendo borradores de categoría {category_id}: {e}")
+            return []
+
+    def update_draft_timestamp(self, tab_id: str) -> bool:
+        """
+        Actualiza solo el timestamp de un borrador
+
+        Args:
+            tab_id: UUID de la pestaña
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            with self.transaction() as conn:
+                conn.execute('''
+                    UPDATE item_drafts
+                    SET updated_at = CURRENT_TIMESTAMP
+                    WHERE tab_id = ?
+                ''', (tab_id,))
+            return True
+
+        except Exception as e:
+            logger.error(f"Error actualizando timestamp de borrador {tab_id}: {e}")
+            return False
+
     # ==================== Context Manager ====================
 
     def __enter__(self):

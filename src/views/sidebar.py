@@ -69,6 +69,9 @@ class Sidebar(QWidget):
     # Signal emitted when screenshot button is clicked
     screenshot_clicked = pyqtSignal()
 
+    # Signal emitted when bulk item creator button is clicked
+    bulk_item_creator_clicked = pyqtSignal()
+
     # Signal emitted when AI Bulk button is clicked
     ai_bulk_clicked = pyqtSignal()
 
@@ -267,6 +270,37 @@ class Sidebar(QWidget):
         """)
         self.screenshot_button.clicked.connect(self.on_screenshot_clicked)
         main_layout.addWidget(self.screenshot_button)
+
+        # Bulk Item Creator button (⚡)
+        self.bulk_item_creator_button = QPushButton("⚡")
+        self.bulk_item_creator_button.setFixedSize(70, 40)
+        self.bulk_item_creator_button.setToolTip("Creador Masivo de Items (Ctrl+Shift+B)")
+        self.bulk_item_creator_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.bulk_item_creator_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.theme.get_color('background_deep')};
+                color: {self.theme.get_color('text_primary')};
+                border: none;
+                border-bottom: 2px solid {self.theme.get_color('background_deep')};
+                font-size: 14pt;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #ffd700,
+                    stop:1 #ff8c00
+                );
+                border-bottom: 2px solid #ffd700;
+                color: #000000;
+            }}
+            QPushButton:pressed {{
+                background-color: {self.theme.get_color('surface')};
+                transform: scale(0.95);
+            }}
+        """)
+        self.bulk_item_creator_button.clicked.connect(self.on_bulk_item_creator_clicked)
+        main_layout.addWidget(self.bulk_item_creator_button)
 
         # MOVED TO QUICK ACCESS PANEL: Advanced Search button
         # self.advanced_search_button = QPushButton("🔍⚡")
@@ -801,6 +835,10 @@ class Sidebar(QWidget):
     def on_refresh_clicked(self):
         """Handle refresh button click"""
         self.refresh_clicked.emit()
+
+    def on_bulk_item_creator_clicked(self):
+        """Handle bulk item creator button click"""
+        self.bulk_item_creator_clicked.emit()
 
     def on_quick_create_clicked(self):
         """Handle quick create button click"""

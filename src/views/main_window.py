@@ -217,6 +217,7 @@ class MainWindow(QMainWindow):
         self.sidebar.favorites_clicked.connect(self.on_favorites_clicked)
         self.sidebar.stats_clicked.connect(self.on_stats_clicked)
         self.sidebar.ai_bulk_clicked.connect(self.on_ai_bulk_clicked)
+        self.sidebar.bulk_item_creator_clicked.connect(self.on_bulk_item_creator_clicked)
         self.sidebar.ai_table_clicked.connect(self.on_ai_table_clicked)
         self.sidebar.browser_clicked.connect(self.on_browser_clicked)
         self.sidebar.dashboard_clicked.connect(self.open_structure_dashboard)
@@ -959,6 +960,51 @@ class MainWindow(QMainWindow):
                 f"Error al abrir el wizard de creación masiva:\n{str(e)}"
             )
 
+    def on_bulk_item_creator_clicked(self):
+        """Handle Bulk Item Creator button click - toggle window"""
+        try:
+            logger.info("Bulk Item Creator button clicked")
+
+            # Import window aquí para evitar circular imports
+            from views.bulk_item_creator_dialog import BulkItemCreatorDialog
+
+            # Si no existe la ventana, crearla
+            if not hasattr(self, 'bulk_creator_window') or self.bulk_creator_window is None:
+                # Obtener DBManager y ConfigManager del controller
+                if not self.controller or not hasattr(self.controller, 'config_manager'):
+                    logger.error("Controller or config_manager not available")
+                    QMessageBox.warning(
+                        self,
+                        "Error",
+                        "No se pudo acceder al gestor de configuración."
+                    )
+                    return
+
+                db_manager = self.controller.config_manager.db
+                config_manager = self.controller.config_manager
+
+                # Crear ventana
+                self.bulk_creator_window = BulkItemCreatorDialog(db_manager, config_manager, parent=self)
+                self.bulk_creator_window.items_saved.connect(self.on_bulk_items_saved)
+                self.bulk_creator_window.closed.connect(self.on_bulk_creator_closed)
+
+                logger.debug("Opening Bulk Item Creator window")
+                self.bulk_creator_window.show()
+            else:
+                # Toggle visibility
+                if self.bulk_creator_window.isVisible():
+                    self.bulk_creator_window.hide()
+                else:
+                    self.bulk_creator_window.show()
+
+        except Exception as e:
+            logger.error(f"Error in on_bulk_item_creator_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir el Creador Masivo de Items:\n{str(e)}"
+            )
+
     def on_ai_table_clicked(self):
         """Handle AI Table creation button click - open wizard"""
         try:
@@ -1154,6 +1200,35 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             logger.error(f"Error in on_bulk_items_created: {e}", exc_info=True)
+
+    def on_bulk_items_saved(self, count: int):
+        """
+        Callback después de guardar items desde el Creador Masivo.
+
+        Args:
+            count: Número de items guardados
+        """
+        try:
+            logger.info(f"Bulk items saved: {count}")
+
+            # Refresh UI - recargar categorías
+            if self.controller:
+                self.controller.load_categories()
+                logger.debug("Categories reloaded after bulk item creation")
+
+            # Mostrar notificación de éxito
+            self.notification_manager.show_notification(
+                f"✅ {count} items guardados exitosamente",
+                duration=3000
+            )
+
+        except Exception as e:
+            logger.error(f"Error in on_bulk_items_saved: {e}", exc_info=True)
+
+    def on_bulk_creator_closed(self):
+        """Callback cuando se cierra la ventana del Creador Masivo"""
+        logger.debug("Bulk Creator window closed")
+        # La ventana se mantiene en memoria para reutilizar
 
     def on_browser_clicked(self):
         """Handle browser button click - toggle browser window"""
@@ -1873,10 +1948,13 @@ class MainWindow(QMainWindow):
         # Register Ctrl+Shift+P to open pinned panels manager
         self.hotkey_manager.register_hotkey("ctrl+shift+p", self.show_pinned_panels_manager)
 
+        # Register Ctrl+Shift+B to open bulk item creator
+        self.hotkey_manager.register_hotkey("ctrl+shift+b", self.on_bulk_item_creator_clicked)
+
         # Start listening for hotkeys
         self.hotkey_manager.start()
 
-        print("Hotkeys registered: Ctrl+Shift+V (toggle window), Ctrl+Shift+N (toggle notebook), Ctrl+Shift+P (panels manager)")
+        print("Hotkeys registered: Ctrl+Shift+V (toggle window), Ctrl+Shift+N (toggle notebook), Ctrl+Shift+P (panels manager), Ctrl+Shift+B (bulk creator)")
 
     def setup_tray(self):
         """Setup system tray icon"""

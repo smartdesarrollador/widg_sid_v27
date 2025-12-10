@@ -63,7 +63,8 @@
       "Bash(git commit:*)",
       "Bash(if not exist \"C:\\Users\\ASUS\\Desktop\\proyectos_python\\widget_sidebar\\util\\FASE4_COMPLETADA.md\" echo.)",
       "Bash(find:*)",
-      "Bash(start /B python main.py)"
+      "Bash(start /B python main.py)",
+      "Bash(echo.:*)"
     ],
     "deny": [],
     "ask": []

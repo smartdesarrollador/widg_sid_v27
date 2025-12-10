@@ -1,0 +1,160 @@
+Traceback (most recent call last):
+  File "C:\Users\ASUS\Desktop\proyectos_python\widget_sidebar\util\test_fase3_widgets.py", line 391, in run_all_tests
+    results.append(("ContextSelectorSection", test_context_selector_section(app)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\Desktop\proyectos_python\widget_sidebar\util\test_fase3_widgets.py", line 167, in test_context_selector_section
+    assert section.list_name_input.isVisible(), "Campo nombre debe estar visible"
+AssertionError: Campo nombre debe estar visible
+INFO:src.views.widgets.project_element_tags_section:Cargados 4 tags de proyecto/área
+INFO:src.views.widgets.project_element_tags_section:Tag 'database' agregado
+INFO:src.views.widgets.project_element_tags_section:Cargados 3 tags de proyecto/área
+WARNING:src.views.widgets.item_fields_section:Validación fallida: 1 errores
+
+================================================================================
+🚀 TESTING FASE 3: Widgets Base
+================================================================================
+
+================================================================================
+🧪 TEST 1: ItemFieldWidget
+================================================================================
+
+[1.1] Test: Creación básica
+   ✅ Widget creado correctamente
+
+[1.2] Test: Valores por defecto
+   ✅ Defaults correctos
+
+[1.3] Test: Serialización to_dict()
+   ✅ Serialización correcta: {'content': 'git status', 'type': 'CODE'}
+
+[1.4] Test: Deserialización from_dict()
+   ✅ Deserialización correcta
+
+[1.5] Test: Verificación de vacío
+   ✅ is_empty() funcionando correctamente
+
+[1.6] Test: Validación
+   ✅ Validación funcionando
+
+✅ Todos los tests de ItemFieldWidget pasaron
+
+================================================================================
+🧪 TEST 2: SelectorWithCreate
+================================================================================
+
+[2.1] Test: Creación de selector
+   ✅ Selector creado
+
+[2.2] Test: Cargar items
+   ✅ 3 items cargados
+
+[2.3] Test: Selección por ID
+   ✅ Selección por ID funcionando
+
+[2.4] Test: Selector requerido
+   ✅ Indicador de requerido funcionando
+
+✅ Todos los tests de SelectorWithCreate pasaron
+
+================================================================================
+🧪 TEST 3: ContextSelectorSection
+================================================================================
+
+[3.1] Test: Creación de sección
+   ✅ Sección creada con todos los selectores
+
+[3.2] Test: Cargar datos en selectores
+   ✅ Datos cargados en todos los selectores
+
+[3.3] Test: Establecer valores
+   ✅ Valores establecidos correctamente
+
+[3.4] Test: Checkbox de lista
+   DEBUG: Antes - Input visible: False, Label visible: False
+   DEBUG: Después - Checkbox checked: True
+   DEBUG: Después - Input visible: False, Label visible: False
+   DEBUG: Después de processEvents - Input visible: False
+
+❌ Error en ContextSelectorSection: Campo nombre debe estar visible
+
+================================================================================
+🧪 TEST 4: TagChip
+================================================================================
+
+[4.1] Test: Creación de chip
+   ✅ Chip creado
+
+[4.2] Test: Toggle de selección
+   ✅ Toggle funcionando
+
+[4.3] Test: set_selected()
+   ✅ set_selected() funcionando
+
+✅ Todos los tests de TagChip pasaron
+
+================================================================================
+🧪 TEST 5: ProjectElementTagsSection
+================================================================================
+
+[5.1] Test: Creación de sección
+   ✅ Sección creada oculta
+
+[5.2] Test: Cargar tags
+   ✅ 4 tags cargados
+
+[5.3] Test: Selección de tags
+   ✅ Tags seleccionados: ['python', 'async']
+
+[5.4] Test: Agregar nuevo tag
+   ✅ Tag agregado correctamente
+
+[5.5] Test: Control de visibilidad
+   ✅ Control de visibilidad funcionando
+
+[5.6] Test: Serialización to_list()
+   ✅ Serialización correcta: ['tag1', 'tag3']
+
+✅ Todos los tests de ProjectElementTagsSection pasaron
+
+================================================================================
+🧪 TEST 6: ItemFieldsSection
+================================================================================
+
+[6.1] Test: Creación de sección
+   ✅ Sección creada con 1 campo por defecto
+
+[6.2] Test: Agregar items
+   ✅ 3 items en total
+
+[6.3] Test: Contador de items con contenido
+   ✅ 2 items con contenido
+
+[6.4] Test: Obtener datos de items
+   ✅ 2 items no vacíos obtenidos
+
+[6.5] Test: Establecer items desde datos
+   ✅ Items establecidos desde datos
+
+[6.6] Test: Validación de items
+   ✅ Validación detectó 1 error(es)
+
+[6.7] Test: Limpiar items
+   ✅ Items limpiados correctamente
+
+✅ Todos los tests de ItemFieldsSection pasaron
+
+================================================================================
+📊 RESUMEN DE TESTS
+================================================================================
+   ItemFieldWidget: ✅ PASÓ
+   SelectorWithCreate: ✅ PASÓ
+   ContextSelectorSection: ❌ FALLÓ
+   TagChip: ✅ PASÓ
+   ProjectElementTagsSection: ✅ PASÓ
+   ItemFieldsSection: ✅ PASÓ
+
+   Total: 5/6 tests pasaron
+
+================================================================================
+❌ ALGUNOS TESTS FALLARON
+================================================================================

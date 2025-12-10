@@ -10,6 +10,12 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
 import logging
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from views.widgets.category_tag_selector import CategoryTagSelector
+from core.category_tag_manager import CategoryTagManager
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -41,9 +47,13 @@ class CategoryFormDialog(QDialog):
         self.db = db
         self.selected_color = None
 
+        # Inicializar CategoryTagManager si db está disponible
+        self.category_tag_manager = CategoryTagManager(self.db) if self.db else None
+
         # Set dialog properties
         self.setModal(True)
-        self.setFixedSize(500, 400)
+        self.setMinimumSize(500, 550)
+        self.resize(550, 600)
 
         # Set title based on mode
         titles = {
@@ -194,10 +204,18 @@ class CategoryFormDialog(QDialog):
         tags_label.setStyleSheet("font-weight: 500;")
         main_layout.addWidget(tags_label)
 
-        self.tags_input = QLineEdit()
-        self.tags_input.setPlaceholderText("backend, devops, programacion (separados por comas)")
-        self.tags_input.setMaxLength(200)
-        main_layout.addWidget(self.tags_input)
+        # Usar CategoryTagSelector si está disponible
+        if self.category_tag_manager:
+            self.tag_selector = CategoryTagSelector(self.category_tag_manager)
+            self.tag_selector.setMinimumHeight(150)
+            main_layout.addWidget(self.tag_selector)
+        else:
+            # Fallback: campo de texto simple si no hay manager
+            self.tags_input = QLineEdit()
+            self.tags_input.setPlaceholderText("backend, devops, programacion (separados por comas)")
+            self.tags_input.setMaxLength(200)
+            main_layout.addWidget(self.tags_input)
+            self.tag_selector = None
 
         # Spacer
         main_layout.addStretch()
@@ -240,11 +258,30 @@ class CategoryFormDialog(QDialog):
             # Load tags
             tags = self.category.get('tags')
             if tags:
-                # Si tags es una lista, convertir a string separado por comas
-                if isinstance(tags, list):
-                    self.tags_input.setText(", ".join(tags))
-                elif isinstance(tags, str):
-                    self.tags_input.setText(tags)
+                if self.tag_selector and self.category_tag_manager:
+                    # Convertir nombres de tags a IDs y configurar en selector
+                    tag_ids = []
+                    tag_list = tags if isinstance(tags, list) else [t.strip() for t in tags.split(",") if t.strip()]
+
+                    for tag_name in tag_list:
+                        # Intentar obtener tag existente
+                        tag = self.category_tag_manager.get_tag_by_name(tag_name)
+                        if tag:
+                            tag_ids.append(tag.id)
+                        else:
+                            # Crear tag si no existe
+                            new_tag = self.category_tag_manager.create_tag(tag_name)
+                            if new_tag:
+                                tag_ids.append(new_tag.id)
+
+                    if tag_ids:
+                        self.tag_selector.set_selected_tags(tag_ids)
+                elif hasattr(self, 'tags_input'):
+                    # Fallback: usar campo de texto simple
+                    if isinstance(tags, list):
+                        self.tags_input.setText(", ".join(tags))
+                    elif isinstance(tags, str):
+                        self.tags_input.setText(tags)
 
     def _update_icon_preview(self, text):
         """Update icon preview"""
@@ -352,9 +389,15 @@ class CategoryFormDialog(QDialog):
 
     def get_data(self):
         """Get form data as dictionary"""
-        # Parse tags from input
-        tags_text = self.tags_input.text().strip()
-        tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()] if tags_text else []
+        # Parse tags from selector or input
+        tags = []
+        if self.tag_selector and self.category_tag_manager:
+            # Obtener nombres de tags desde el selector
+            tags = self.tag_selector.get_selected_tag_names()
+        elif hasattr(self, 'tags_input'):
+            # Fallback: parsear desde campo de texto
+            tags_text = self.tags_input.text().strip()
+            tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()] if tags_text else []
 
         return {
             'name': self.name_input.text().strip(),

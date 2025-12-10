@@ -605,6 +605,124 @@ def migration_004_create_project_element_tags(db: DBManager) -> None:
         raise
 
 
+def migration_005_add_item_drafts_table(db: DBManager) -> None:
+    """
+    Migración 005: Crear tabla item_drafts para persistencia de borradores
+    del Creador Masivo de Items
+
+    Esta migración:
+    1. Crea tabla 'item_drafts' con campos para persistir borradores
+    2. Crea índices para optimización de búsquedas
+    3. Soporte para JSON en campos de items y tags
+
+    Args:
+        db: DBManager instance
+    """
+    try:
+        print("\n" + "=" * 80)
+        print("🔄 MIGRACIÓN 005: Creación de Tabla item_drafts")
+        print("=" * 80)
+
+        conn = db.connect()
+        cursor = conn.cursor()
+
+        # Verificar si la tabla ya existe
+        cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='item_drafts'
+        """)
+        table_exists = cursor.fetchone() is not None
+
+        if table_exists:
+            print("⚠️  La tabla 'item_drafts' ya existe.")
+            print("   Saltando creación de tabla...")
+            return
+
+        # Paso 1: Crear tabla item_drafts
+        print("\n[1/3] Creando tabla 'item_drafts'...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS item_drafts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tab_id TEXT NOT NULL UNIQUE,
+                tab_name TEXT DEFAULT 'Sin título',
+                project_id INTEGER DEFAULT NULL,
+                area_id INTEGER DEFAULT NULL,
+                category_id INTEGER DEFAULT NULL,
+                create_as_list BOOLEAN DEFAULT 0,
+                list_name TEXT DEFAULT NULL,
+                item_tags_json TEXT DEFAULT NULL,
+                project_element_tags_json TEXT DEFAULT NULL,
+                items_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+            )
+        """)
+        conn.commit()
+        print("   ✓ Tabla 'item_drafts' creada")
+
+        # Paso 2: Crear índices
+        print("\n[2/3] Creando índices para 'item_drafts'...")
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_drafts_tab_id
+            ON item_drafts(tab_id)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_drafts_updated
+            ON item_drafts(updated_at DESC)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_drafts_category
+            ON item_drafts(category_id)
+        """)
+
+        conn.commit()
+        print("   ✓ Índices creados: idx_drafts_tab_id, idx_drafts_updated, idx_drafts_category")
+
+        # Paso 3: Verificar creación
+        print("\n[3/3] Verificando tabla creada...")
+
+        cursor.execute("PRAGMA table_info(item_drafts)")
+        columns = cursor.fetchall()
+        print(f"   ✓ Tabla 'item_drafts': {len(columns)} columnas")
+
+        cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='index' AND tbl_name='item_drafts'
+        """)
+        indices = cursor.fetchall()
+        print(f"   ✓ Índices en 'item_drafts': {len(indices)}")
+
+        print("\n" + "=" * 80)
+        print("✅ MIGRACIÓN 005 COMPLETADA EXITOSAMENTE")
+        print("=" * 80)
+        print("\nTabla creada:")
+        print("  • item_drafts")
+        print("    - tab_id (UNIQUE) - UUID de la pestaña")
+        print("    - tab_name - Nombre de la pestaña")
+        print("    - project_id, area_id, category_id - FKs opcionales")
+        print("    - create_as_list, list_name - Configuración de lista")
+        print("    - item_tags_json - Tags de items (JSON array)")
+        print("    - project_element_tags_json - Tags de proyecto/área (JSON array)")
+        print("    - items_json - Items del borrador (JSON array)")
+        print("    - created_at, updated_at - Timestamps")
+        print("\nÍndices creados:")
+        print("  • idx_drafts_tab_id - Búsqueda rápida por tab_id")
+        print("  • idx_drafts_updated - Ordenamiento por fecha de actualización")
+        print("  • idx_drafts_category - Búsqueda por categoría")
+        print("\n✅ Sistema de persistencia de borradores listo para usar")
+
+    except Exception as e:
+        logger.error(f"❌ Error en migración 005: {e}")
+        print(f"\n❌ Error durante migración 005: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
 if __name__ == "__main__":
     """
     Run migration when script is executed directly
