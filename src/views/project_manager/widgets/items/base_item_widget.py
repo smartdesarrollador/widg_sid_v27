@@ -50,6 +50,9 @@ class BaseItemWidget(QFrame):
 
     def init_base_ui(self):
         """Inicializar UI base común a todos los items"""
+        # Establecer ancho fijo para el contenedor del item
+        self.setFixedWidth(800)  # ANCHO FIJO: 800px
+
         # Layout principal (horizontal)
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(12, 12, 12, 12)

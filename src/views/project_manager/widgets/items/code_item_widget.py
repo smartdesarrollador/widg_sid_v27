@@ -60,19 +60,27 @@ class CodeItemWidget(BaseItemWidget):
         # Contenido de código
         content = self.get_item_content()
         if content:
-            # Crear label para el código (sin límites)
+            # Crear label para el código (sin límites, 100% responsive)
             self.content_label = QLabel()
             self.content_label.setObjectName("code_content")
-            self.content_label.setWordWrap(False)  # Preservar formato de código
+            self.content_label.setWordWrap(True)  # IMPORTANTE: ajustar al ancho
+            self.content_label.setMaximumWidth(720)  # Limitar ancho para evitar overflow
             self.content_label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+            self.content_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Preferred
             )
             self.content_label.setStyleSheet("""
                 color: #7CFC00;
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 12px;
                 background-color: transparent;
-                white-space: pre;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                word-break: break-word;
+                overflow-wrap: anywhere;
             """)
 
             # Si el contenido es largo, mostrar todo por defecto (expandido)

@@ -59,18 +59,26 @@ class TextItemWidget(BaseItemWidget):
         # Contenido
         content = self.get_item_content()
         if content:
-            # Crear label para el contenido (sin límites)
+            # Crear label para el contenido (sin límites, 100% responsive)
             self.content_label = QLabel()
             self.content_label.setObjectName("text_content")
-            self.content_label.setWordWrap(True)
+            self.content_label.setWordWrap(True)  # IMPORTANTE: ajustar al ancho
+            self.content_label.setMaximumWidth(720)  # Limitar ancho para evitar overflow
             self.content_label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+            self.content_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Preferred
             )
             self.content_label.setStyleSheet("""
                 color: #E0E0E0;
                 font-size: 13px;
                 line-height: 1.6;
                 font-family: 'Segoe UI', Arial, sans-serif;
+                word-wrap: break-word;
+                word-break: break-word;
+                overflow-wrap: anywhere;
             """)
 
             # Si el contenido es largo, mostrar todo por defecto (expandido)

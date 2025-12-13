@@ -77,10 +77,15 @@ class URLItemWidget(BaseItemWidget):
             self.content_label = QLabel()
             self.content_label.setObjectName("url_text")
             self.content_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            self.content_label.setMaximumWidth(720)  # Limitar ancho para evitar overflow
             self.content_label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
             )
-            self.content_label.setWordWrap(True)
+            self.content_label.setWordWrap(True)  # IMPORTANTE: ajustar al ancho
+            self.content_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Preferred
+            )
             self.content_label.mousePressEvent = lambda event: self.open_url(content)
             self.content_label.setToolTip("Click para abrir en navegador")
             self.content_label.setStyleSheet("""
@@ -88,6 +93,9 @@ class URLItemWidget(BaseItemWidget):
                 font-size: 13px;
                 text-decoration: underline;
                 font-family: 'Segoe UI', Arial, sans-serif;
+                word-wrap: break-word;
+                word-break: break-word;
+                overflow-wrap: anywhere;
             """)
 
             # Si el contenido es largo, mostrar todo por defecto (expandido)

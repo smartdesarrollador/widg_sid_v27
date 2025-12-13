@@ -80,16 +80,24 @@ class PathItemWidget(BaseItemWidget):
             self.content_label = QLabel()
             self.content_label.setObjectName("path_text")
             self.content_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            self.content_label.setMaximumWidth(720)  # Limitar ancho para evitar overflow
             self.content_label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
             )
-            self.content_label.setWordWrap(True)
+            self.content_label.setWordWrap(True)  # IMPORTANTE: ajustar al ancho
+            self.content_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Preferred
+            )
             self.content_label.mousePressEvent = lambda event: self.open_path(path_content)
             self.content_label.setToolTip("Click para abrir en explorador")
             self.content_label.setStyleSheet("""
                 color: #FFA500;
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 12px;
+                word-wrap: break-word;
+                word-break: break-word;
+                overflow-wrap: anywhere;
             """)
 
             # Si el contenido es largo, mostrar todo por defecto (expandido)
