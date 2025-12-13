@@ -227,15 +227,16 @@ Python fue creado por Guido van Rossum y lanzado por primera vez en 1991. El nom
                 return None
 
             # 2. Obtener TODOS los tags que tienen elementos asociados al proyecto
-            # (no solo los de project_tag_orders, sino todos los que tienen relaciones)
+            # Ordenados según project_tag_orders (respetando el orden del usuario)
             conn = self.db.connect()
             cursor = conn.execute("""
                 SELECT DISTINCT pet.id, pet.name, pet.color
                 FROM project_element_tag_associations ta
                 JOIN project_element_tags pet ON ta.tag_id = pet.id
                 JOIN project_relations pr ON ta.project_relation_id = pr.id
+                LEFT JOIN project_tag_orders pto ON pto.project_id = pr.project_id AND pto.tag_id = pet.id
                 WHERE pr.project_id = ?
-                ORDER BY pet.name ASC
+                ORDER BY COALESCE(pto.order_index, 999999), pet.name ASC
             """, (project_id,))
             project_tags = [dict(row) for row in cursor.fetchall()]
 
